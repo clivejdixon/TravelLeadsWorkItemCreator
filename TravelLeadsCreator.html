@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EMEA PS — Travel Leads CSV Importer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f6f8fb;
+      --surface: #ffffff;
+      --surface-2: #f0f6ff;
+      --text: #1b2533;
+      --muted: #667085;
+      --border: #d7deea;
+      --accent: #0a66c2;
+      --accent-2: #6848ff;
+      --accent-3: #00a78e;
+      --success: #1f8f4d;
+      --error: #d92d20;
+      --warning: #b54708;
+      --shadow: 0 12px 40px rgba(16, 24, 40, .08);
+      --radius: 18px;
+    }
+
+    body {
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, #eaf4ff 0, transparent 26%),
+        radial-gradient(circle at top right, #efeaff 0, transparent 22%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px 16px 48px;
+    }
+
+    .container { max-width: 1240px; margin: 0 auto; }
+
+    .hero {
+      background: linear-gradient(135deg, #ffffff, #f7faff 45%, #f5f1ff);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      padding: 26px;
+      margin-bottom: 20px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: #eef5ff;
+      border: 1px solid #dbe8ff;
+      color: var(--accent);
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: .8rem;
+      margin-bottom: 14px;
+    }
+
+    h1 { font-size: clamp(1.7rem, 2.4vw, 2.5rem); line-height: 1.08; margin-bottom: 10px; }
+    .subtitle { color: var(--muted); font-size: 1rem; line-height: 1.6; max-width: 900px; }
+
+    .layout { display: grid; grid-template-columns: 430px 1fr; gap: 20px; align-items: start; }
+    @media (max-width: 1050px) { .layout { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .card h2 { font-size: 1.05rem; margin-bottom: 14px; }
+    .muted { color: var(--muted); }
+    .tiny { font-size: .82rem; color: var(--muted); }
+
+    .status-banner {
+      display: none;
+      margin-bottom: 16px;
+      border-radius: 14px;
+      padding: 12px 14px;
+      border: 1px solid transparent;
+      font-weight: 600;
+    }
+    .status-banner.info { background: #ecf4ff; color: var(--accent); border-color: #cfe0ff; }
+    .status-banner.success { background: #eafbf0; color: var(--success); border-color: #caefd5; }
+    .status-banner.error { background: #fff1f1; color: var(--error); border-color: #ffd1d1; }
+    .status-banner.warn { background: #fff6ed; color: var(--warning); border-color: #ffddb5; }
+
+    .stack { display: grid; gap: 14px; }
+
+    .kv { display: grid; grid-template-columns: 140px 1fr; gap: 10px; font-size: .92rem; }
+    .kv strong { color: var(--text); }
+
+    .dropzone {
+      border: 2px dashed #c7d7ef;
+      border-radius: 16px;
+      padding: 18px;
+      background: linear-gradient(180deg, #fafcff, #f5f9ff);
+    }
+    .dropzone input[type="file"] { width: 100%; }
+
+    .button-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .14s ease, box-shadow .14s ease, opacity .14s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+    .btn-primary { color: white; background: linear-gradient(135deg, var(--accent), #3888de); box-shadow: 0 8px 24px rgba(10,102,194,.18); }
+    .btn-secondary { color: var(--accent); background: #edf5ff; border: 1px solid #d4e5ff; }
+    .btn-ghost { color: var(--muted); background: #f8fafc; border: 1px solid var(--border); }
+
+    .pill-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pill {
+      padding: 7px 10px;
+      background: #f8fbff;
+      border: 1px solid #dbe8ff;
+      border-radius: 999px;
+      font-size: .8rem;
+      color: #365a7b;
+    }
+
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .stat {
+      background: linear-gradient(180deg, #fafcff, #f4f8ff);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+    }
+    .stat .value { font-size: 1.35rem; font-weight: 800; margin-top: 4px; }
+    .stat .label { font-size: .82rem; color: var(--muted); }
+
+    .pipeline-card { overflow: hidden; position: relative; }
+    .pipeline-header { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 14px; }
+
+    .pipeline {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      align-items: center;
+      min-height: 320px;
+      padding: 18px;
+      border-radius: 20px;
+      background:
+        linear-gradient(180deg, #fcfdff, #f5f9ff 48%, #fbf9ff),
+        white;
+      border: 1px solid #e6edf7;
+    }
+    @media (max-width: 820px) {
+      .pipeline { grid-template-columns: 1fr; min-height: 520px; }
+    }
+
+    .node { position: relative; z-index: 2; display: grid; justify-items: center; gap: 10px; text-align: center; }
+    .icon-shell {
+      width: 116px;
+      height: 116px;
+      border-radius: 28px;
+      background: linear-gradient(180deg, #fff, #f2f6ff);
+      border: 1px solid var(--border);
+      box-shadow: 0 14px 30px rgba(25, 65, 120, .10);
+      display: grid;
+      place-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .node h3 { font-size: .98rem; }
+    .node p { font-size: .82rem; color: var(--muted); max-width: 180px; line-height: 1.5; }
+
+    .gear {
+      position: absolute;
+      border-radius: 50%;
+      border: 10px dashed rgba(53, 92, 146, .16);
+      animation: spin 3.6s linear infinite;
+      opacity: .9;
+    }
+    .gear.small { width: 34px; height: 34px; bottom: 10px; right: 10px; border-width: 7px; animation-duration: 2.4s; }
+    .gear.mid { width: 48px; height: 48px; top: 10px; left: 10px; border-width: 8px; animation-direction: reverse; }
+    .gear.big { width: 64px; height: 64px; top: 18px; right: 18px; border-width: 9px; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .connector {
+      position: absolute;
+      top: 50%;
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(10,102,194,.10), rgba(104,72,255,.2), rgba(0,167,142,.14));
+      z-index: 1;
+      overflow: hidden;
+    }
+    .connector::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      width: 160px;
+      background: linear-gradient(90deg, transparent, rgba(71, 137, 255, .75), transparent);
+      animation: flow 2.4s linear infinite;
+    }
+    .connector.one { left: calc(16.66% + 60px); width: calc(33.33% - 100px); }
+    .connector.two { left: calc(50% + 28px); width: calc(33.33% - 100px); }
+    @media (max-width: 820px) {
+      .connector { width: 6px !important; left: 50% !important; transform: translateX(-50%); }
+      .connector.one { top: 165px; height: 120px; }
+      .connector.two { top: 338px; height: 120px; }
+      .connector::after { width: 100%; height: 120px; background: linear-gradient(180deg, transparent, rgba(71, 137, 255, .75), transparent); animation: flow-vertical 2.4s linear infinite; }
+    }
+    @keyframes flow { from { transform: translateX(-180px); } to { transform: translateX(420px); } }
+    @keyframes flow-vertical { from { transform: translateY(-120px); } to { transform: translateY(160px); } }
+
+    .particle {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #4d9dff, #7b6dff);
+      box-shadow: 0 8px 20px rgba(77, 157, 255, .32);
+      opacity: 0;
+      z-index: 3;
+    }
+    .pipeline.running .particle { animation: particlePath 3.2s linear infinite; }
+    .pipeline.running .particle.p2 { animation-delay: .8s; }
+    .pipeline.running .particle.p3 { animation-delay: 1.6s; }
+
+    @keyframes particlePath {
+      0%   { opacity: 0; transform: translate(120px, 120px) scale(.6); }
+      8%   { opacity: 1; }
+      34%  { opacity: 1; transform: translate(415px, 120px) scale(1); }
+      50%  { transform: translate(620px, 120px) scale(.95); }
+      70%  { opacity: 1; transform: translate(770px, 120px) scale(1); }
+      100% { opacity: 0; transform: translate(980px, 120px) scale(.5); }
+    }
+    @media (max-width: 1100px) {
+      @keyframes particlePath {
+        0%   { opacity: 0; transform: translate(90px, 120px) scale(.6); }
+        8%   { opacity: 1; }
+        34%  { opacity: 1; transform: translate(280px, 120px) scale(1); }
+        50%  { transform: translate(410px, 120px) scale(.95); }
+        70%  { opacity: 1; transform: translate(540px, 120px) scale(1); }
+        100% { opacity: 0; transform: translate(690px, 120px) scale(.5); }
+      }
+    }
+    @media (max-width: 820px) {
+      .particle { left: 50%; margin-left: -9px; }
+      .pipeline.running .particle { animation: particleVertical 3.2s linear infinite; }
+      @keyframes particleVertical {
+        0%   { opacity: 0; transform: translate(0, 80px) scale(.65); }
+        8%   { opacity: 1; }
+        36%  { opacity: 1; transform: translate(0, 210px) scale(1); }
+        60%  { opacity: 1; transform: translate(0, 335px) scale(1); }
+        100% { opacity: 0; transform: translate(0, 470px) scale(.55); }
+      }
+    }
+
+    .stage-list { display: grid; gap: 10px; margin-top: 14px; }
+    .stage {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #e6edf7;
+      background: #fbfdff;
+      font-size: .9rem;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #c2d3ea; flex-shrink: 0; }
+    .stage.active .dot { background: var(--accent); box-shadow: 0 0 0 6px rgba(10,102,194,.12); }
+    .stage.done .dot { background: var(--success); box-shadow: 0 0 0 6px rgba(31,143,77,.12); }
+
+    .progress-wrap { margin-top: 12px; }
+    .progress-bar { height: 12px; border-radius: 999px; background: #edf2fb; overflow: hidden; border: 1px solid #e0e8f5; }
+    .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent-3)); transition: width .25s ease; }
+
+    .table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 16px; }
+    table { width: 100%; border-collapse: collapse; min-width: 900px; font-size: .88rem; }
+    thead { background: #f8fbff; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #eef3fa; text-align: left; vertical-align: top; }
+    th { font-size: .76rem; text-transform: uppercase; letter-spacing: .03em; color: #54657a; }
+    tbody tr:hover { background: #fbfdff; }
+
+    details.debug-panel { margin-top: 20px; }
+    details.debug-panel summary { cursor: pointer; font-weight: 700; color: var(--muted); }
+    #debugLog {
+      margin-top: 12px;
+      background: #0f1728;
+      color: #dbe8ff;
+      border-radius: 16px;
+      padding: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .78rem;
+      max-height: 260px;
+      overflow: auto;
+      white-space: pre-wrap;
+      line-height: 1.45;
+    }
+    .log-info { color: #a9d1ff; }
+    .log-ok { color: #9ae6b4; }
+    .log-warn { color: #fbd38d; }
+    .log-error { color: #feb2b2; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <div class="eyebrow">CSV automation demo · CD_TravelLeads2 only</div>
+      <h1>Salesforce travel leads into Genesys Cloud workitems</h1>
+      <p class="subtitle">This version reads lead records from <strong>TravelLeadsSampleData.csv</strong>, validates them against the <strong>CD_TravelLeads2</strong> worktype schema, then creates workitems in Genesys Cloud while showing a live Salesforce → Informatica → Genesys Cloud animation.</p>
+    </section>
+
+    <div id="statusBanner" class="status-banner" role="alert"></div>
+
+    <div class="layout">
+      <section class="stack">
+        <div class="card">
+          <h2>Import setup</h2>
+          <div class="stack">
+            <div class="kv"><strong>Target worktype</strong><span id="worktypeLabel">Resolving…</span></div>
+            <div class="kv"><strong>Authentication</strong><span id="authState" class="muted">Checking Genesys Cloud sign-in…</span></div>
+            <div class="dropzone stack">
+              <label for="csvFile"><strong>Optional CSV override</strong></label>
+              <input type="file" id="csvFile" accept=".csv,text/csv" />
+              <p class="tiny">No file selected uses the embedded sample from the attached TravelLeadsSampleData.csv.</p>
+            </div>
+            <div class="button-row">
+              <button id="previewBtn" class="btn btn-secondary" type="button">Preview rows</button>
+              <button id="runBtn" class="btn btn-primary" type="button" disabled>Run import</button>
+              <button id="resetBtn" class="btn btn-ghost" type="button">Reset</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>CSV coverage</h2>
+          <div class="pill-grid" id="fieldPills"></div>
+        </div>
+
+        <div class="card">
+          <h2>Import summary</h2>
+          <div class="stats">
+            <div class="stat"><div class="label">Rows loaded</div><div class="value" id="rowsLoaded">0</div></div>
+            <div class="stat"><div class="label">Created</div><div class="value" id="rowsCreated">0</div></div>
+            <div class="stat"><div class="label">Failed</div><div class="value" id="rowsFailed">0</div></div>
+          </div>
+          <div class="progress-wrap">
+            <div class="tiny" id="progressText" style="margin-bottom:8px;">Waiting to start…</div>
+            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="stack">
+        <div class="card pipeline-card">
+          <div class="pipeline-header">
+            <div>
+              <h2>Animated flow</h2>
+              <p class="tiny">Live stage feedback while each lead is transformed and posted as a Genesys Cloud workitem.</p>
+            </div>
+            <div class="tiny" id="activeRowLabel">No active record</div>
+          </div>
+
+          <div class="pipeline" id="pipeline">
+            <div class="connector one"></div>
+            <div class="connector two"></div>
+            <div class="particle p1"></div>
+            <div class="particle p2"></div>
+            <div class="particle p3"></div>
+
+            <div class="node" id="nodeSalesforce">
+              <div class="icon-shell">
+                <div class="gear mid"></div>
+                <svg width="76" height="54" viewBox="0 0 140 98" aria-hidden="true">
+                  <g fill="#1d9bf0">
+                    <path d="M45 77c-16 0-29-11-29-25 0-12 10-22 23-24 5-14 21-24 39-24 20 0 37 12 41 29 12 2 21 12 21 24 0 15-13 27-30 27H45z"/>
+                  </g>
+                  <text x="70" y="57" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">SF</text>
+                </svg>
+              </div>
+              <h3>Salesforce</h3>
+              <p>Source lead rows are read from the CSV and prepared for downstream processing.</p>
+            </div>
+
+            <div class="node" id="nodeInformatica">
+              <div class="icon-shell">
+                <div class="gear big"></div>
+                <svg width="78" height="78" viewBox="0 0 100 100" aria-hidden="true">
+                  <rect x="20" y="18" width="60" height="64" rx="16" fill="#ff6b2c" />
+                  <rect x="42" y="24" width="16" height="52" rx="8" fill="#fff" />
+                  <rect x="24" y="42" width="52" height="16" rx="8" fill="#fff" />
+                </svg>
+              </div>
+              <h3>Informatica</h3>
+              <p>Data is transformed, normalised, and filtered so only valid workitem fields remain.</p>
+            </div>
+
+            <div class="node" id="nodeGenesys">
+              <div class="icon-shell">
+                <div class="gear small"></div>
+                <svg width="78" height="78" viewBox="0 0 100 100" aria-hidden="true">
+                  <path d="M18 72c9-27 28-44 52-50-7 8-12 17-16 26 8-6 18-11 28-14-12 18-18 35-18 48-10-1-24-4-46-10z" fill="#ff6a00"/>
+                </svg>
+              </div>
+              <h3>Genesys Cloud</h3>
+              <p>The final payload is posted to Task Management as a new <strong>CD_TravelLeads2</strong> workitem.</p>
+            </div>
+          </div>
+
+          <div class="stage-list">
+            <div class="stage" id="stageSource"><span class="dot"></span><span>Salesforce source row selected</span></div>
+            <div class="stage" id="stageTransform"><span class="dot"></span><span>Mapped and transformed for Informatica handoff</span></div>
+            <div class="stage" id="stageCreate"><span class="dot"></span><span>Genesys Cloud workitem created</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Preview</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Name</th>
+                  <th>Brand</th>
+                  <th>Email</th>
+                  <th>Lead Score</th>
+                  <th>Travel Date</th>
+                  <th>Preferred Contact</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="previewBody">
+                <tr><td colspan="8" class="muted">No preview loaded yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <details class="debug-panel" open>
+      <summary>🛠 Debug Log</summary>
+      <div id="debugLog"></div>
+    </details>
+  </div>
+
+<script>
+  const CLIENT_ID = '584c1e79-568e-4d71-91ff-3e00bf01d04b';
+  const REGION = 'euw2.pure.cloud';
+  const API_BASE = 'https://api.' + REGION;
+  const AUTH_BASE = 'https://login.' + REGION;
+  const REDIRECT_URI = window.location.origin + window.location.pathname;
+  const TARGET_WORKTYPE_NAME = 'CD_TravelLeads2';
+  const EMBEDDED_CSV_ROWS = [{"name": "SaleforceLeads01", "selling_co_text": "CHUSAS", "sf_record_type_text": "B2C RAQ", "task_type_text": "Salesforce", "sf_rq_type_text": "Request A Quote", "operating_brand_text": "Contiki", "requested_agent_text": "clive.dixon.a2@genesyslab.com", "emailaddress_text": "millicent.webb@fakemail.com", "phone_number_text": "+01555203040", "firstname_text": "Millicent", "lastname_text": "Webb", "salesforceid_url": "https://ttccrm.my.salesforce-setup.com/apex/Genesys_Screenpop?encryptedId=b03c43e138144aa7e1bec79a386e3abcc79044bef5c9bebf2dce9989d4f47e2e ", "sf_auto_quoted_checkbox": "FALSE", "sf_lead_id_url": "https://ttccrm.my.salesforce-setup.com/apex/Genesys_Screenpop?encryptedId=734889fcda0ed9fe58d26a25a675a72c7e5e40fd49b831294694634f9850ceac ", "sf_lead_category_enum": "Medium", "sf_lead_score_integer": "20", "sf_opp_score_integer": "30", "sf_past_pax_checkbox": "FALSE", "sf_travel_date_date": "2026-04-28", "tourcount_rating_integer": "3", "sf_region_text": "USAS", "sf_tour_name_text": "Best of Italy", "pref_contact_enum": "email", "air_gt_text": "JFK", "notes_longtext": "", "sf_costco_text": "", "sf_lead_source_text": "", "action_text": "", "lead_record_type_text": "Youth"}, {"name": "SaleforceLeads02", "selling_co_text": "TTCANS", "sf_record_type_text": "B2C RAQ", "task_type_text": "Salesforce", "sf_rq_type_text": "Request A Quote", "operating_brand_text": "Trafalgar", "requested_agent_text": "", "emailaddress_text": "basil.dawson@fakemail.com", "phone_number_text": "+01555607080", "firstname_text": "Basil", "lastname_text": "Dawson", "salesforceid_url": "", "sf_auto_quoted_checkbox": "FALSE", "sf_lead_id_url": "", "sf_lead_category_enum": "Low", "sf_lead_score_integer": "10", "sf_opp_score_integer": "20", "sf_past_pax_checkbox": "TRUE", "sf_travel_date_date": "2026-10-31", "tourcount_rating_integer": "0", "sf_region_text": "CANS", "sf_tour_name_text": "Rivers Of Bablylon", "pref_contact_enum": "", "air_gt_text": "LHR", "notes_longtext": "", "sf_costco_text": "", "sf_lead_source_text": "", "action_text": "", "lead_record_type_text": ""}, {"name": "SaleforceLeads03", "selling_co_text": "IVSYDS", "sf_record_type_text": "B2C RAQ", "task_type_text": "Salesforce", "sf_rq_type_text": "Request A Quote", "operating_brand_text": "Insight Vacations", "requested_agent_text": "", "emailaddress_text": "elinor.mccallister@fakemail.com", "phone_number_text": "+447798765432", "firstname_text": "Elinor", "lastname_text": "McCallister", "salesforceid_url": "", "sf_auto_quoted_checkbox": "FALSE", "sf_lead_id_url": "", "sf_lead_category_enum": "Low", "sf_lead_score_integer": "20", "sf_opp_score_integer": "10", "sf_past_pax_checkbox": "FALSE", "sf_travel_date_date": "2027-04-01", "tourcount_rating_integer": "1", "sf_region_text": "SYDS", "sf_tour_name_text": "Mega Tours", "pref_contact_enum": "phone", "air_gt_text": "HND", "notes_longtext": "", "sf_costco_text": "", "sf_lead_source_text": "", "action_text": "", "lead_record_type_text": ""}, {"name": "SaleforceLeads04", "selling_co_text": "LGUKLS", "sf_record_type_text": "B2C RAQ", "task_type_text": "Salesforce", "sf_rq_type_text": "Request A Quote", "operating_brand_text": "Luxury Gold", "requested_agent_text": "clive.dixon.a2@genesyslab.com", "emailaddress_text": "archimedes.clarke@fakemail.com", "phone_number_text": "+442089012345", "firstname_text": "Archie", "lastname_text": "Clarke", "salesforceid_url": "", "sf_auto_quoted_checkbox": "FALSE", "sf_lead_id_url": "", "sf_lead_category_enum": "Medium", "sf_lead_score_integer": "30", "sf_opp_score_integer": "20", "sf_past_pax_checkbox": "TRUE", "sf_travel_date_date": "2026-12-25", "tourcount_rating_integer": "2", "sf_region_text": "OSTS", "sf_tour_name_text": "Secrets of Europe", "pref_contact_enum": "", "air_gt_text": "GRU", "notes_longtext": "", "sf_costco_text": "", "sf_lead_source_text": "", "action_text": "", "lead_record_type_text": ""}, {"name": "SaleforceLeads05", "selling_co_text": "COUKLS", "sf_record_type_text": "B2C RAQ", "task_type_text": "Salesforce", "sf_rq_type_text": "Request A Quote", "operating_brand_text": "Trafalgar", "requested_agent_text": "", "emailaddress_text": "eilonwy.pritchard@fakemail.com", "phone_number_text": "+447798765432", "firstname_text": "Eilonwy", "lastname_text": "Pritchard", "salesforceid_url": "", "sf_auto_quoted_checkbox": "FALSE", "sf_lead_id_url": "", "sf_lead_category_enum": "High", "sf_lead_score_integer": "50", "sf_opp_score_integer": "40", "sf_past_pax_checkbox": "FALSE", "sf_travel_date_date": "2027-05-01", "tourcount_rating_integer": "3", "sf_region_text": "UKLS", "sf_tour_name_text": "Hidden treasures of the Far East", "pref_contact_enum": "phone", "air_gt_text": "DXB", "notes_longtext": "", "sf_costco_text": "", "sf_lead_source_text": "", "action_text": "", "lead_record_type_text": ""}, {"name": "SaleforceLeads06", "selling_co_text": "COUSAS", "sf_record_type_text": "B2C RAQ", "task_type_text": "Salesforce", "sf_rq_type_text": "Request A Quote", "operating_brand_text": "Luxury Gold", "requested_agent_text": "", "emailaddress_text": "thomas.odoyle@fakemail.com", "phone_number_text": "+447798765432", "firstname_text": "Thomas", "lastname_text": "O’Doyle", "salesforceid_url": "", "sf_auto_quoted_checkbox": "FALSE", "sf_lead_id_url": "", "sf_lead_category_enum": "Low", "sf_lead_score_integer": "40", "sf_opp_score_integer": "10", "sf_past_pax_checkbox": "TRUE", "sf_travel_date_date": "2027-02-28", "tourcount_rating_integer": "5", "sf_region_text": "AKLS", "sf_tour_name_text": "Getaways of the Baltic", "pref_contact_enum": "email", "air_gt_text": "YVR", "notes_longtext": "", "sf_costco_text": "", "sf_lead_source_text": "", "action_text": "", "lead_record_type_text": ""}, {"name": "SaleforceLeads07", "selling_co_text": "COSYDS", "sf_record_type_text": "B2C RAQ", "task_type_text": "Salesforce", "sf_rq_type_text": "Request A Quote", "operating_brand_text": "Trafalgar", "requested_agent_text": "clive.dixon.a2@genesyslab.com", "emailaddress_text": "kida.nedakh@fakemail.com", "phone_number_text": "+447798765432", "firstname_text": "Kida", "lastname_text": "Nedakh", "salesforceid_url": "", "sf_auto_quoted_checkbox": "FALSE", "sf_lead_id_url": "", "sf_lead_category_enum": "Medium", "sf_lead_score_integer": "20", "sf_opp_score_integer": "20", "sf_past_pax_checkbox": "FALSE", "sf_travel_date_date": "2026-10-31", "tourcount_rating_integer": "7", "sf_region_text": "JBGS", "sf_tour_name_text": "Mediterranian Treasures", "pref_contact_enum": "", "air_gt_text": "CPT", "notes_longtext": "", "sf_costco_text": "", "sf_lead_source_text": "", "action_text": "", "lead_record_type_text": ""}, {"name": "SaleforceLeads08", "selling_co_text": "COUKLS", "sf_record_type_text": "B2C RAQ", "task_type_text": "Salesforce", "sf_rq_type_text": "Request A Quote", "operating_brand_text": "Luxury Gold", "requested_agent_text": "", "emailaddress_text": "john.silverman@", "phone_number_text": "+447798765432", "firstname_text": "John", "lastname_text": "Silverman", "salesforceid_url": "", "sf_auto_quoted_checkbox": "TRUE", "sf_lead_id_url": "", "sf_lead_category_enum": "High", "sf_lead_score_integer": "10", "sf_opp_score_integer": "30", "sf_past_pax_checkbox": "TRUE", "sf_travel_date_date": "2026-12-31", "tourcount_rating_integer": "4", "sf_region_text": "SINS", "sf_tour_name_text": "Best of Greece", "pref_contact_enum": "email", "air_gt_text": "SIN", "notes_longtext": "", "sf_costco_text": "", "sf_lead_source_text": "", "action_text": "", "lead_record_type_text": ""}, {"name": "SaleforceLeads09", "selling_co_text": "IVSINS", "sf_record_type_text": "B2C RAQ", "task_type_text": "Salesforce", "sf_rq_type_text": "Request A Quote", "operating_brand_text": "Insight Vacations", "requested_agent_text": "", "emailaddress_text": "percy.whitaker@fakemail.com", "phone_number_text": "+447798765432", "firstname_text": "Percy", "lastname_text": "Whitaker", "salesforceid_url": "", "sf_auto_quoted_checkbox": "FALSE", "sf_lead_id_url": "", "sf_lead_category_enum": "Low", "sf_lead_score_integer": "10", "sf_opp_score_integer": "40", "sf_past_pax_checkbox": "FALSE", "sf_travel_date_date": "2027-02-13", "tourcount_rating_integer": "3", "sf_region_text": "EUOS", "sf_tour_name_text": "Great British Getaways", "pref_contact_enum": "email", "air_gt_text": "MAD", "notes_longtext": "", "sf_costco_text": "", "sf_lead_source_text": "", "action_text": "", "lead_record_type_text": ""}, {"name": "SaleforceLeads10", "selling_co_text": "TTUSAS", "sf_record_type_text": "B2C RAQ", "task_type_text": "Salesforce", "sf_rq_type_text": "Request A Quote", "operating_brand_text": "Trafalgar", "requested_agent_text": "", "emailaddress_text": "flora.goodwin@fakemail.com", "phone_number_text": "+447798765432", "firstname_text": "Flora", "lastname_text": "Goodwin", "salesforceid_url": "", "sf_auto_quoted_checkbox": "TRUE", "sf_lead_id_url": "", "sf_lead_category_enum": "Medium", "sf_lead_score_integer": "50", "sf_opp_score_integer": "50", "sf_past_pax_checkbox": "TRUE", "sf_travel_date_date": "2026-05-07", "tourcount_rating_integer": "0", "sf_region_text": "", "sf_tour_name_text": "European Hops", "pref_contact_enum": "phone", "air_gt_text": "ORD", "notes_longtext": "", "sf_costco_text": "", "sf_lead_source_text": "", "action_text": "", "lead_record_type_text": ""}];
+  const EMBEDDED_CSV_FIELDS = ["name", "selling_co_text", "sf_record_type_text", "task_type_text", "sf_rq_type_text", "operating_brand_text", "requested_agent_text", "emailaddress_text", "phone_number_text", "firstname_text", "lastname_text", "salesforceid_url", "sf_auto_quoted_checkbox", "sf_lead_id_url", "sf_lead_category_enum", "sf_lead_score_integer", "sf_opp_score_integer", "sf_past_pax_checkbox", "sf_travel_date_date", "tourcount_rating_integer", "sf_region_text", "sf_tour_name_text", "pref_contact_enum", "air_gt_text", "notes_longtext", "sf_costco_text", "sf_lead_source_text", "action_text", "lead_record_type_text"];
+
+  let accessToken = '';
+  let targetWorktypeId = '';
+  let targetSchemaProperties = null;
+  let datasetRows = [];
+  let datasetFields = [...EMBEDDED_CSV_FIELDS];
+  let importInProgress = false;
+
+  const logEl = document.getElementById('debugLog');
+
+  function log(msg, level) {
+    level = level || 'info';
+    const ts = new Date().toISOString().slice(11, 23);
+    const line = document.createElement('div');
+    line.className = 'log-' + level;
+    line.textContent = '[' + ts + '] ' + msg;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+    if (level === 'error') console.error(msg); else console.log(msg);
+  }
+
+  function showStatus(message, type) {
+    type = type || 'info';
+    const el = document.getElementById('statusBanner');
+    el.textContent = message;
+    el.className = 'status-banner ' + type;
+    el.style.display = 'block';
+  }
+
+  function setAuthState(text) {
+    document.getElementById('authState').textContent = text;
+  }
+
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function generateCodeVerifier() {
+    const arr = new Uint8Array(64);
+    crypto.getRandomValues(arr);
+    return btoa(String.fromCharCode.apply(null, arr)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  }
+
+  async function generateCodeChallenge(verifier) {
+    const data = new TextEncoder().encode(verifier);
+    const digest = await crypto.subtle.digest('SHA-256', data);
+    return btoa(String.fromCharCode.apply(null, new Uint8Array(digest))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  }
+
+  async function redirectToGenesysOAuth() {
+    const verifier = generateCodeVerifier();
+    const challenge = await generateCodeChallenge(verifier);
+    sessionStorage.setItem('pkce_verifier', verifier);
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: CLIENT_ID,
+      redirect_uri: REDIRECT_URI,
+      code_challenge: challenge,
+      code_challenge_method: 'S256'
+    });
+    log('Redirecting to Genesys PKCE auth...', 'info');
+    window.location.href = AUTH_BASE + '/oauth/authorize?' + params.toString();
+  }
+
+  async function exchangeCodeForToken(code) {
+    const verifier = sessionStorage.getItem('pkce_verifier');
+    if (!verifier) throw new Error('PKCE verifier missing from sessionStorage.');
+    const response = await fetch(AUTH_BASE + '/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: CLIENT_ID,
+        code,
+        redirect_uri: REDIRECT_URI,
+        code_verifier: verifier
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error_description || 'Token exchange failed');
+    }
+    sessionStorage.removeItem('pkce_verifier');
+    return data.access_token;
+  }
+
+  async function apiFetch(path, options) {
+    options = options || {};
+    const url = path.startsWith('http') ? path : API_BASE + path;
+    log('--> ' + (options.method || 'GET') + ' ' + url, 'info');
+    const response = await fetch(url, Object.assign({}, options, {
+      headers: Object.assign({
+        Authorization: 'Bearer ' + accessToken,
+        Accept: 'application/json',
+        'Content-Type': 'application/json'
+      }, options.headers || {})
+    }));
+    const text = await response.text();
+    let data;
+    try { data = JSON.parse(text); } catch (e) { data = text; }
+    if (!response.ok) {
+      log('<-- ' + response.status + ' ' + response.statusText + ': ' + JSON.stringify(data), 'error');
+      throw new Error('API ' + response.status + ': ' + response.statusText);
+    }
+    log('<-- ' + response.status + ' OK', 'ok');
+    return data;
+  }
+
+  async function fetchTargetWorktype() {
+    log('Resolving worktype ' + TARGET_WORKTYPE_NAME + '...', 'info');
+    const data = await apiFetch('/api/v2/taskmanagement/worktypes/query', {
+      method: 'POST',
+      body: JSON.stringify({
+        pageSize: 100,
+        attributes: ['id', 'name']
+      })
+    });
+    const match = (data.entities || []).find(wt => wt.name === TARGET_WORKTYPE_NAME);
+    if (!match) throw new Error('Worktype ' + TARGET_WORKTYPE_NAME + ' was not found.');
+    targetWorktypeId = match.id;
+    document.getElementById('worktypeLabel').textContent = TARGET_WORKTYPE_NAME + ' · ' + match.id;
+    log('Matched worktype id=' + match.id, 'ok');
+
+    const detail = await apiFetch('/api/v2/taskmanagement/worktypes/' + match.id);
+    const schemaId = detail.schema && detail.schema.id;
+    if (!schemaId) throw new Error('Target worktype has no schema.');
+    const schema = await apiFetch('/api/v2/taskmanagement/workitems/schemas/' + schemaId);
+    targetSchemaProperties = schema.jsonSchema && schema.jsonSchema.properties ? schema.jsonSchema.properties : (schema.properties || {});
+    log('Schema fields: ' + Object.keys(targetSchemaProperties).join(', '), 'ok');
+  }
+
+  function formatDateValue(val) {
+    if (!val) return val;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+    const parts = val.split('/');
+    if (parts.length === 3) return parts[2] + '-' + parts[1] + '-' + parts[0];
+    return val;
+  }
+
+  function formatDateTimeValue(val) {
+    if (!val) return val;
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(val)) return val + ':00Z';
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(val)) return val + 'Z';
+    return val;
+  }
+
+  function normalizeCsvValue(value) {
+    if (typeof value !== 'string') return value;
+    return value.replace(/ /g, ' ').trim();
+  }
+
+  function normalizeBoolean(value) {
+    const v = String(value || '').trim().toLowerCase();
+    return v === 'true' || v === '1' || v === 'yes' || v === 'y';
+  }
+
+  function parseCSV(text) {
+    const rows = [];
+    let current = '';
+    let row = [];
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      const next = text[i + 1];
+      if (ch === '"') {
+        if (inQuotes && next === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === ',' && !inQuotes) {
+        row.push(current);
+        current = '';
+      } else if ((ch === '
+' || ch === '
+') && !inQuotes) {
+        if (ch === '
+' && next === '
+') i++;
+        row.push(current);
+        current = '';
+        if (row.some(cell => cell !== '')) rows.push(row);
+        row = [];
+      } else {
+        current += ch;
+      }
+    }
+
+    if (current.length || row.length) {
+      row.push(current);
+      if (row.some(cell => cell !== '')) rows.push(row);
+    }
+
+    if (!rows.length) return { fields: [], rows: [] };
+
+    const fields = rows[0].map(cell => normalizeCsvValue(cell));
+    const dataRows = rows.slice(1).map(cols => {
+      const obj = {};
+      fields.forEach((field, index) => {
+        obj[field] = normalizeCsvValue(cols[index] || '');
+      });
+      return obj;
+    });
+
+    return { fields, rows: dataRows };
+  }
+
+  function loadEmbeddedDataset() {
+    datasetRows = EMBEDDED_CSV_ROWS.map(row => {
+      const copy = {};
+      Object.keys(row).forEach(key => copy[key] = normalizeCsvValue(row[key] || ''));
+      return copy;
+    });
+    datasetFields = [...EMBEDDED_CSV_FIELDS];
+    updateFieldPills();
+    updatePreview();
+    updateStats(0, 0, datasetRows.length);
+    log('Loaded embedded CSV dataset with ' + datasetRows.length + ' row(s).', 'ok');
+  }
+
+  function updateFieldPills() {
+    const wrap = document.getElementById('fieldPills');
+    wrap.innerHTML = '';
+    datasetFields.forEach(field => {
+      const pill = document.createElement('span');
+      pill.className = 'pill';
+      pill.textContent = field;
+      wrap.appendChild(pill);
+    });
+  }
+
+  function updateStats(created, failed, loaded) {
+    document.getElementById('rowsLoaded').textContent = loaded;
+    document.getElementById('rowsCreated').textContent = created;
+    document.getElementById('rowsFailed').textContent = failed;
+  }
+
+  function updateProgress(current, total, text) {
+    document.getElementById('progressText').textContent = text;
+    document.getElementById('progressFill').style.width = total ? ((current / total) * 100).toFixed(1) + '%' : '0%';
+  }
+
+  function updatePreview(statusMap) {
+    statusMap = statusMap || {};
+    const body = document.getElementById('previewBody');
+    body.innerHTML = '';
+
+    if (!datasetRows.length) {
+      body.innerHTML = '<tr><td colspan="8" class="muted">No rows available.</td></tr>';
+      return;
+    }
+
+    datasetRows.slice(0, 10).forEach((row, index) => {
+      const tr = document.createElement('tr');
+      const status = statusMap[index] || 'Ready';
+      tr.innerHTML = `
+        <td>${index + 1}</td>
+        <td>${escapeHtml(row.name || '')}</td>
+        <td>${escapeHtml(row.operating_brand_text || '')}</td>
+        <td>${escapeHtml(row.emailaddress_text || '')}</td>
+        <td>${escapeHtml(row.sf_lead_score_integer || '')}</td>
+        <td>${escapeHtml(row.sf_travel_date_date || '')}</td>
+        <td>${escapeHtml(row.pref_contact_enum || '')}</td>
+        <td>${escapeHtml(status)}</td>`;
+      body.appendChild(tr);
+    });
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  }
+
+  function setPipelineRunning(running) {
+    const pipeline = document.getElementById('pipeline');
+    pipeline.classList.toggle('running', running);
+  }
+
+  function setStageState(stageId, state) {
+    const el = document.getElementById(stageId);
+    el.classList.remove('active', 'done');
+    if (state) el.classList.add(state);
+  }
+
+  function resetStageState() {
+    ['stageSource', 'stageTransform', 'stageCreate'].forEach(id => setStageState(id, ''));
+    document.getElementById('activeRowLabel').textContent = 'No active record';
+  }
+
+  function mapRowToPayload(row) {
+    const customFields = {};
+    const schemaFields = targetSchemaProperties || {};
+
+    Object.keys(row).forEach(key => {
+      if (key === 'name') return;
+      if (!(key in schemaFields)) return;
+      const rawValue = normalizeCsvValue(row[key]);
+      if (rawValue === '') return;
+
+      if (key.endsWith('_checkbox')) customFields[key] = normalizeBoolean(rawValue);
+      else if (key.endsWith('_date')) customFields[key] = formatDateValue(rawValue);
+      else if (key.endsWith('_datetime')) customFields[key] = formatDateTimeValue(rawValue);
+      else if (key.endsWith('_integer')) {
+        const intVal = parseInt(rawValue, 10);
+        if (!Number.isNaN(intVal)) customFields[key] = intVal;
+      } else if (key.endsWith('_number')) {
+        const numVal = parseFloat(rawValue);
+        if (!Number.isNaN(numVal)) customFields[key] = numVal;
+      } else {
+        customFields[key] = rawValue;
+      }
+    });
+
+    return {
+      typeId: targetWorktypeId,
+      name: normalizeCsvValue(row.name || 'Travel Lead'),
+      customFields
+    };
+  }
+
+  async function createWorkItemFromRow(row) {
+    const payload = mapRowToPayload(row);
+    log('Creating work item ' + payload.name + ' with ' + Object.keys(payload.customFields).length + ' custom field(s).', 'info');
+    return apiFetch('/api/v2/taskmanagement/workitems', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async function animateRowFlow(rowIndex, rowName) {
+    document.getElementById('activeRowLabel').textContent = 'Processing row ' + (rowIndex + 1) + ': ' + rowName;
+    setStageState('stageSource', 'active');
+    setStageState('stageTransform', '');
+    setStageState('stageCreate', '');
+    await sleep(450);
+    setStageState('stageSource', 'done');
+    setStageState('stageTransform', 'active');
+    await sleep(650);
+    setStageState('stageTransform', 'done');
+    setStageState('stageCreate', 'active');
+  }
+
+  async function runImport() {
+    if (importInProgress) return;
+    if (!accessToken) {
+      showStatus('Authentication is required before the import can run.', 'error');
+      return;
+    }
+    if (!targetWorktypeId) {
+      showStatus('The target worktype could not be resolved.', 'error');
+      return;
+    }
+    if (!datasetRows.length) {
+      showStatus('No CSV rows are loaded.', 'error');
+      return;
+    }
+
+    importInProgress = true;
+    document.getElementById('runBtn').disabled = true;
+    document.getElementById('previewBtn').disabled = true;
+    document.getElementById('csvFile').disabled = true;
+    setPipelineRunning(true);
+    showStatus('Import started. Creating workitems for ' + datasetRows.length + ' travel lead row(s)…', 'info');
+
+    let created = 0;
+    let failed = 0;
+    const statuses = {};
+    updateStats(created, failed, datasetRows.length);
+    updateProgress(0, datasetRows.length, 'Starting import…');
+
+    for (let i = 0; i < datasetRows.length; i++) {
+      const row = datasetRows[i];
+      const rowName = row.name || ('Row ' + (i + 1));
+      statuses[i] = 'Processing';
+      updatePreview(statuses);
+      updateProgress(i, datasetRows.length, 'Preparing ' + rowName + '…');
+      await animateRowFlow(i, rowName);
+
+      try {
+        const result = await createWorkItemFromRow(row);
+        created++;
+        statuses[i] = 'Created · ' + result.id;
+        setStageState('stageCreate', 'done');
+        log('Created ' + rowName + ' as ' + result.id, 'ok');
+      } catch (err) {
+        failed++;
+        statuses[i] = 'Failed · ' + err.message;
+        setStageState('stageCreate', '');
+        log('Failed ' + rowName + ': ' + err.message, 'error');
+      }
+
+      updateStats(created, failed, datasetRows.length);
+      updatePreview(statuses);
+      updateProgress(i + 1, datasetRows.length, 'Processed ' + (i + 1) + ' of ' + datasetRows.length + ' rows.');
+      await sleep(450);
+    }
+
+    importInProgress = false;
+    setPipelineRunning(false);
+    resetStageState();
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('previewBtn').disabled = false;
+    document.getElementById('csvFile').disabled = false;
+
+    if (failed === 0) showStatus('Import finished successfully. Created ' + created + ' workitems.', 'success');
+    else showStatus('Import finished with ' + created + ' created and ' + failed + ' failed.', 'warn');
+  }
+
+  async function handleCsvSelection(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) {
+      loadEmbeddedDataset();
+      return;
+    }
+    const text = await file.text();
+    const parsed = parseCSV(text);
+    datasetFields = parsed.fields;
+    datasetRows = parsed.rows;
+    updateFieldPills();
+    updatePreview();
+    updateStats(0, 0, datasetRows.length);
+    updateProgress(0, datasetRows.length, 'Custom CSV loaded and ready.');
+    showStatus('Loaded ' + datasetRows.length + ' row(s) from ' + file.name + '.', 'info');
+    log('Loaded user-selected CSV ' + file.name + ' with ' + datasetRows.length + ' row(s).', 'ok');
+  }
+
+  function resetUi() {
+    if (importInProgress) return;
+    document.getElementById('csvFile').value = '';
+    loadEmbeddedDataset();
+    resetStageState();
+    updateProgress(0, datasetRows.length, 'Reset to embedded sample data.');
+    showStatus('Reset complete. Embedded sample CSV restored.', 'info');
+  }
+
+  async function init() {
+    log('App initialising...', 'info');
+    log('Redirect URI: ' + REDIRECT_URI, 'info');
+
+    document.getElementById('previewBtn').addEventListener('click', () => {
+      updatePreview();
+      showStatus('Preview refreshed for ' + datasetRows.length + ' row(s).', 'info');
+    });
+    document.getElementById('runBtn').addEventListener('click', runImport);
+    document.getElementById('resetBtn').addEventListener('click', resetUi);
+    document.getElementById('csvFile').addEventListener('change', handleCsvSelection);
+
+    loadEmbeddedDataset();
+    resetStageState();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const authError = urlParams.get('error');
+
+    if (authError) {
+      const desc = urlParams.get('error_description') || authError;
+      setAuthState('Auth error: ' + desc);
+      showStatus('Authentication error: ' + desc, 'error');
+      return;
+    }
+
+    try {
+      if (code) {
+        window.history.replaceState({}, document.title, window.location.origin + window.location.pathname);
+        accessToken = await exchangeCodeForToken(code);
+        sessionStorage.setItem('gc_access_token', accessToken);
+      } else {
+        const cached = sessionStorage.getItem('gc_access_token');
+        if (cached) accessToken = cached;
+        else {
+          setAuthState('Redirecting to Genesys login…');
+          await redirectToGenesysOAuth();
+          return;
+        }
+      }
+
+      setAuthState('Authenticated');
+      await fetchTargetWorktype();
+      document.getElementById('runBtn').disabled = false;
+      showStatus('Authenticated and ready. The import will create ' + datasetRows.length + ' CD_TravelLeads2 workitems.', 'success');
+    } catch (err) {
+      log('Initialisation failed: ' + err.message, 'error');
+      setAuthState('Failed');
+      showStatus('Initialisation failed: ' + err.message, 'error');
+      sessionStorage.removeItem('gc_access_token');
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
