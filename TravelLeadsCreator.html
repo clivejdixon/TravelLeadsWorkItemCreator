@@ -640,12 +640,8 @@
       } else if (ch === ',' && !inQuotes) {
         row.push(current);
         current = '';
-      } else if ((ch === '
-' || ch === '
-') && !inQuotes) {
-        if (ch === '
-' && next === '
-') i++;
+      } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
+        if (ch === '\r' && next === '\n') i++;
         row.push(current);
         current = '';
         if (row.some(cell => cell !== '')) rows.push(row);
