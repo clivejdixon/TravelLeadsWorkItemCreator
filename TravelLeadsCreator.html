@@ -324,7 +324,7 @@
 <body>
   <div class="container">
     <section class="hero">
-      <div class="eyebrow">CSV automation demo · CD_TravelLeads2 only</div>
+      <div class="eyebrow">Salesforce Leads import to Genesys Cloud</div>
       <h1>Salesforce → Informatica → Genesys Cloud</h1>
       
     </section>
@@ -338,6 +338,9 @@
           <div class="stack">
             <div class="kv"><strong>Target worktype</strong><span id="worktypeLabel">Resolving…</span></div>
             <div class="kv"><strong>Authentication</strong><span id="authState" class="muted">Checking Genesys Cloud sign-in…</span></div>
+            <div class="button-row" style="margin-top:10px">
+              <button type="button" id="signInBtn" class="btn btn-secondary" style="display:none">Sign in to Genesys Cloud</button>
+            </div>
             <div class="dropzone stack">
               <label for="csvFile"><strong>Optional CSV override</strong></label>
               <input type="file" id="csvFile" accept=".csv,text/csv" />
@@ -506,6 +509,10 @@
     document.getElementById('authState').textContent = text;
   }
 
+  function setSignInVisible(visible) {
+    document.getElementById('signInBtn').style.display = visible ? 'inline-flex' : 'none';
+  }
+
   function requireValidRedirectUri() {
     if (REDIRECT_URI) return true;
     setAuthState('Authentication requires a hosted HTTPS URL.');
@@ -544,15 +551,7 @@
     });
     const authUrl = AUTH_BASE + '/oauth/authorize?' + params.toString();
     log('Redirecting to Genesys PKCE auth with redirect URI: ' + REDIRECT_URI, 'info');
-    try {
-      if (window.top && window.top !== window.self) {
-        window.top.location.href = authUrl;
-        return;
-      }
-    } catch (e) {
-      log('Top window redirect unavailable, falling back to current window: ' + e.message, 'warn');
-    }
-    window.location.href = authUrl;
+    window.location.assign(authUrl);
   }
 
   async function exchangeCodeForToken(code) {
@@ -598,6 +597,12 @@
     }
     log('<-- ' + response.status + ' OK', 'ok');
     return data;
+  }
+
+
+  async function validateToken() {
+    log('Validating access token with /api/v2/organizations/me ...', 'info');
+    return await apiFetch('/api/v2/organizations/me');
   }
 
   async function fetchTargetWorktype() {
@@ -952,28 +957,43 @@
     }
 
     try {
+      const signInBtn = document.getElementById('signInBtn');
+      signInBtn.addEventListener('click', async () => {
+        setAuthState('Redirecting to Genesys login…');
+        setSignInVisible(false);
+        await redirectToGenesysOAuth();
+      });
+
       if (code) {
         window.history.replaceState({}, document.title, window.location.origin + window.location.pathname);
+        setAuthState('Completing Genesys Cloud sign-in…');
         accessToken = await exchangeCodeForToken(code);
         sessionStorage.setItem('gc_access_token', accessToken);
       } else {
         const cached = sessionStorage.getItem('gc_access_token');
-        if (cached) accessToken = cached;
-        else {
+        if (cached) {
+          accessToken = cached;
+          setAuthState('Using existing Genesys Cloud session…');
+        } else {
           if (!requireValidRedirectUri()) return;
-          setAuthState('Redirecting to Genesys login…');
-          await redirectToGenesysOAuth();
+          setAuthState('Sign-in required');
+          setSignInVisible(true);
+          showStatus('Click “Sign in to Genesys Cloud” to start authentication.', 'info');
+          log('Waiting for user to start OAuth redirect.', 'info');
           return;
         }
       }
 
+      await validateToken();
       setAuthState('Authenticated');
+      setSignInVisible(false);
       await fetchTargetWorktype();
       document.getElementById('runBtn').disabled = false;
       showStatus('Authenticated and ready. The import will create ' + datasetRows.length + ' CD_TravelLeads2 workitems.', 'success');
     } catch (err) {
       log('Initialisation failed: ' + err.message, 'error');
-      setAuthState('Failed');
+      setAuthState('Sign-in required');
+      setSignInVisible(true);
       showStatus('Initialisation failed: ' + err.message, 'error');
       sessionStorage.removeItem('gc_access_token');
     }
