@@ -324,7 +324,7 @@
 <body>
   <div class="container">
     <section class="hero">
-      <div class="eyebrow">Salesforce Leads import to Genesys Cloud</div>
+      <div class="eyebrow">Salesforce Leads to Genesys Cloud import</div>
       <h1>Salesforce → Informatica → Genesys Cloud</h1>
       
     </section>
@@ -513,10 +513,30 @@
     document.getElementById('signInBtn').style.display = visible ? 'inline-flex' : 'none';
   }
 
+  function safeText(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  }
+
+  function renderAuthDiagnostics(extra) {
+    const diag = document.getElementById('authDiagnostics');
+    if (!diag) return;
+    const items = [
+      ['Client ID', CLIENT_ID],
+      ['Region', REGION],
+      ['Redirect URI', REDIRECT_URI || '[empty]'],
+      ['Page URL', window.location.href]
+    ];
+    if (extra) {
+      Object.keys(extra).forEach(key => items.push([key, extra[key]]));
+    }
+    diag.innerHTML = items.map(([k,v]) => '<div><strong>' + safeText(k) + ':</strong> ' + safeText(v) + '</div>').join('');
+  }
+
   function requireValidRedirectUri() {
     if (REDIRECT_URI) return true;
     setAuthState('Authentication requires a hosted HTTPS URL.');
     showStatus('This app cannot authenticate from file:/// paths. Host it on HTTPS or set REDIRECT_URI_OVERRIDE.', 'error');
+    renderAuthDiagnostics({ 'Problem': 'Redirect URI is empty. This page must run from a hosted HTTPS URL or use REDIRECT_URI_OVERRIDE.' });
     log('OAuth blocked because REDIRECT_URI is empty.', 'error');
     return false;
   }
@@ -551,6 +571,7 @@
     });
     const authUrl = AUTH_BASE + '/oauth/authorize?' + params.toString();
     log('Redirecting to Genesys PKCE auth with redirect URI: ' + REDIRECT_URI, 'info');
+    renderAuthDiagnostics({ 'Auth request': authUrl });
     window.location.assign(authUrl);
   }
 
@@ -571,7 +592,7 @@
     });
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.error_description || 'Token exchange failed');
+      throw new Error((data.error || 'token_error') + ': ' + (data.error_description || 'Token exchange failed'));
     }
     sessionStorage.removeItem('pkce_verifier');
     return data.access_token;
@@ -601,8 +622,9 @@
 
 
   async function validateToken() {
-    log('Validating access token with /api/v2/organizations/me ...', 'info');
-    return await apiFetch('/api/v2/organizations/me');
+    if (!accessToken) throw new Error('No access token available after sign-in.');
+    log('Access token received. Skipping /api/v2/organizations/me validation because this OAuth client is not authorised for organization scopes.', 'warn');
+    return { ok: true };
   }
 
   async function fetchTargetWorktype() {
@@ -933,6 +955,7 @@
     log('App initialising...', 'info');
     log('Page location: ' + window.location.href, 'info');
     log('Redirect URI: ' + (REDIRECT_URI || '[not available - local file mode]'), 'info');
+    renderAuthDiagnostics();
 
     document.getElementById('previewBtn').addEventListener('click', () => {
       updatePreview();
@@ -948,11 +971,13 @@
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const authError = urlParams.get('error');
+    const rawSearch = window.location.search;
 
     if (authError) {
       const desc = urlParams.get('error_description') || authError;
       setAuthState('Auth error: ' + desc);
       showStatus('Authentication error: ' + desc, 'error');
+      renderAuthDiagnostics({ 'OAuth error': authError, 'OAuth error description': desc, 'Returned query string': rawSearch || '[none]' });
       return;
     }
 
@@ -973,12 +998,14 @@
         const cached = sessionStorage.getItem('gc_access_token');
         if (cached) {
           accessToken = cached;
+        renderAuthDiagnostics({ 'Authentication': 'Using cached token' });
           setAuthState('Using existing Genesys Cloud session…');
         } else {
           if (!requireValidRedirectUri()) return;
           setAuthState('Sign-in required');
           setSignInVisible(true);
           showStatus('Click “Sign in to Genesys Cloud” to start authentication.', 'info');
+          renderAuthDiagnostics({ 'Authentication': 'Waiting for sign-in' });
           log('Waiting for user to start OAuth redirect.', 'info');
           return;
         }
@@ -994,7 +1021,7 @@
       log('Initialisation failed: ' + err.message, 'error');
       setAuthState('Sign-in required');
       setSignInVisible(true);
-      showStatus('Initialisation failed: ' + err.message, 'error');
+      showStatus('Initialisation failed: ' + err.message + (err.message.indexOf('403') !== -1 ? ' — the OAuth client is signed in, but it may still need Task Management scopes.' : ''), 'error');
       sessionStorage.removeItem('gc_access_token');
     }
   }
