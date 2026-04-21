@@ -457,6 +457,13 @@
   </div>
 
 <script>
+  function resolveRedirectUri() {
+    const override = (typeof REDIRECT_URI_OVERRIDE === 'string' ? REDIRECT_URI_OVERRIDE.trim() : '');
+    if (override) return override;
+    if (window.location.protocol === 'file:') return '';
+    return window.location.origin + window.location.pathname;
+  }
+
   const CLIENT_ID = '584c1e79-568e-4d71-91ff-3e00bf01d04b';
   const REGION = 'euw2.pure.cloud';
   const API_BASE = 'https://api.' + REGION;
@@ -499,6 +506,14 @@
     document.getElementById('authState').textContent = text;
   }
 
+  function requireValidRedirectUri() {
+    if (REDIRECT_URI) return true;
+    setAuthState('Authentication requires a hosted HTTPS URL.');
+    showStatus('This app cannot authenticate from file:/// paths. Host it on HTTPS or set REDIRECT_URI_OVERRIDE.', 'error');
+    log('OAuth blocked because REDIRECT_URI is empty.', 'error');
+    return false;
+  }
+
   function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -527,8 +542,17 @@
       code_challenge: challenge,
       code_challenge_method: 'S256'
     });
-    log('Redirecting to Genesys PKCE auth...', 'info');
-    window.location.href = AUTH_BASE + '/oauth/authorize?' + params.toString();
+    const authUrl = AUTH_BASE + '/oauth/authorize?' + params.toString();
+    log('Redirecting to Genesys PKCE auth with redirect URI: ' + REDIRECT_URI, 'info');
+    try {
+      if (window.top && window.top !== window.self) {
+        window.top.location.href = authUrl;
+        return;
+      }
+    } catch (e) {
+      log('Top window redirect unavailable, falling back to current window: ' + e.message, 'warn');
+    }
+    window.location.href = authUrl;
   }
 
   async function exchangeCodeForToken(code) {
